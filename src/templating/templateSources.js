@@ -27,25 +27,39 @@
 
     // ---- ko.templateSources.domElement -----
 
+    var domElementNodesDataKey = ko.utils.domData.nextKey();
     ko.templateSources.domElement = function(element) {
+        var tagNameLower = ko.utils.tagNameLower(this.domElement);
+
+        this.elemContentsProperty = tagNameLower === "script" ? "text"
+                                  : tagNameLower === "textarea" ? "value"
+                                  : "innerHTML";
         this.domElement = element;
     }
 
     ko.templateSources.domElement.prototype['text'] = function(/* valueToWrite */) {
-        var tagNameLower = ko.utils.tagNameLower(this.domElement),
-            elemContentsProperty = tagNameLower === "script" ? "text"
-                                 : tagNameLower === "textarea" ? "value"
-                                 : "innerHTML";
-
         if (arguments.length == 0) {
-            return this.domElement[elemContentsProperty];
+            return this.domElement[this.elemContentsProperty];
         } else {
             var valueToWrite = arguments[0];
-            if (elemContentsProperty === "innerHTML")
+            if (this.elemContentsProperty === "innerHTML")
                 ko.utils.setHtml(this.domElement, valueToWrite);
             else
-                this.domElement[elemContentsProperty] = valueToWrite;
+                this.domElement[this.elemContentsProperty] = valueToWrite;
+
+            ko.utils.domData.set(this.domElement, domElementNodesDataKey, null);
         }
+    };
+
+    ko.templateSources.domElement.prototype['nodes'] = function(/* valueToWrite */) {
+        var parsedNodes = ko.utils.domData.get(this.domElement, domElementNodesDataKey);
+
+        if (!parsedNodes) {
+            parsedNodes = ko.utils.parseHtmlFragment('<div>' + this.domElement[this.elemContentsProperty] + '</div>')[0];
+            ko.utils.domData.set(this.domElement, domElementNodesDataKey, parsedNodes);
+        }
+
+        return parsedNodes;
     };
 
     var dataDomDataPrefix = ko.utils.domData.nextKey() + "_";
@@ -79,7 +93,7 @@
             ko.utils.domData.set(this.domElement, anonymousTemplatesDomDataKey, {textData: valueToWrite});
         }
     };
-    ko.templateSources.domElement.prototype['nodes'] = function(/* valueToWrite */) {
+    ko.templateSources.anonymousTemplate.prototype['nodes'] = function(/* valueToWrite */) {
         if (arguments.length == 0) {
             var templateData = ko.utils.domData.get(this.domElement, anonymousTemplatesDomDataKey) || {};
             return templateData.containerData;
